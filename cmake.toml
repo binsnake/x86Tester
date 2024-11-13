@@ -1,0 +1,68 @@
+# Reference: https://build-cpp.github.io/cmkr/cmake-toml
+[cmake]
+version = "3.25"
+
+[project]
+name = "x86Tester"
+
+[subdir.thirdparty]
+
+[target.x86Tester-sandbox]
+type = "executable"
+sources = ["src/sandbox/main.cpp"]
+compile-features = ["cxx_std_23"]
+# Disable runtime checks
+msvc.compile-options = ["/Ob2", "/Oi"]
+msvc.link-options = ["/NODEFAULTLIB", "/ENTRY:rawEntry", "/DYNAMICBASE:NO", "/BASE:0x70000000"]
+
+[target.x86Tester-sandbox.properties]
+PROJECT_LABEL = "sandbox"
+
+[target.x86Tester-core]
+type = "static"
+alias = "x86Tester::core"
+sources = ["src/core/logging.cpp"]
+headers = ["include/x86Tester/logging.hpp"]
+link-libraries = ["Zydis", "sfl"]
+compile-features = ["cxx_std_23"]
+include-directories = ["include"]
+private-include-directories = ["src/core"]
+
+[target.x86Tester-core.properties]
+PROJECT_LABEL = "core"
+
+[target.x86Tester-execution]
+type = "static"
+alias = "x86Tester::execution"
+sources = ["src/execution/execution.cpp"]
+headers = ["include/x86Tester/execution.hpp"]
+private-include-directories = ["src/execution", "include/x86Tester"]
+include-directories = ["include"]
+compile-features = ["cxx_std_23"]
+link-libraries = ["x86Tester::core"]
+
+[target.x86Tester-execution.properties]
+PROJECT_LABEL = "execution"
+
+[target.x86Tester-generator]
+type = "static"
+alias = "x86Tester::generator"
+sources = ["src/generator/generator.cpp"]
+headers = ["include/x86Tester/generator.hpp", "include/x86Tester/basegenerator.hpp", "include/x86Tester/inputgenerator.hpp"]
+private-include-directories = ["src/generator", "include/x86Tester"]
+include-directories = ["include"]
+compile-features = ["cxx_std_23"]
+link-libraries = ["x86Tester::core"]
+
+[target.x86Tester-generator.properties]
+PROJECT_LABEL = "generator"
+
+[target.x86Tester-cli]
+type = "executable"
+sources = ["src/cli/main.cpp"]
+headers = ["src/cli/utils.hpp"]
+compile-features = ["cxx_std_23"]
+private-link-libraries = ["x86Tester::core", "x86Tester::generator", "x86Tester::execution"]
+
+[target.x86Tester-cli.properties]
+PROJECT_LABEL = "cli"
