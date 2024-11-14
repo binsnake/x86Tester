@@ -255,6 +255,7 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
     bool resultAlwaysZero = false;
     bool firstBitAlwaysZero = false;
     bool inputIsImmediate = false;
+    size_t numBitsZero = 0;
 
     if (ops[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE)
     {
@@ -282,6 +283,19 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
             break;
         case ZYDIS_MNEMONIC_MOV:
             resultAlwaysZero = rightInputZero;
+            break;
+        case ZYDIS_MNEMONIC_LEA:
+            // If mem is [rax+rax*1] then the first bit is always zero.
+            firstBitAlwaysZero = ops[1].mem.base != ZYDIS_REGISTER_NONE && ops[1].mem.index == ops[1].mem.base
+                && ops[1].mem.disp.value == 0;
+            if (ops[1].mem.base == ZYDIS_REGISTER_NONE && ops[1].mem.index != ZYDIS_REGISTER_NONE && ops[1].mem.scale > 1
+                && ops[1].mem.disp.value == 0)
+            {
+                // The first bits are always zero based on scale.
+                // Turn multiply into shift
+                const auto shift = static_cast<std::uint8_t>(std::log2(ops[1].mem.scale));
+                numBitsZero = shift;
+            }
             break;
     }
 
@@ -311,12 +325,15 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
             case ZYDIS_MNEMONIC_SETZ:
                 maxBits = 1;
                 break;
+            case ZYDIS_MNEMONIC_LEA:
+                maxBits = instr.info.address_width;
+                break;
         }
 
         for (std::uint16_t bitPos = 0; bitPos < regSize; ++bitPos)
         {
             bool testZero = testRegZero;
-            bool testOne = !resultAlwaysZero && bitPos < maxBits;
+            bool testOne = bitPos >= numBitsZero && !resultAlwaysZero && bitPos < maxBits;
 
             if (instr.info.mnemonic == ZYDIS_MNEMONIC_MOV && inputIsImmediate)
             {
@@ -716,10 +733,7 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
             clearOutput(ctx, testBitInfo);
 
             // Assign inputs.
-            // if (iteration % 2 == 0)
             advanceInputs(ctx, prng, inputGenerators, instr, testEntry, iteration);
-            // else
-            // randomizeInputs(ctx, prng, instr, testEntry, iteration);
 
             if (!ctx.execute())
             {
@@ -876,7 +890,7 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_BTR);
+    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_LEA);
 
     Logging::startProgress("Building instructions");
 
