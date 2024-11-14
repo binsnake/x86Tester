@@ -1,5 +1,4 @@
 #pragma once
-#pragma optimize("", off)
 
 #include <array>
 #include <cassert>

@@ -141,22 +141,35 @@ static sfl::static_vector<ZydisRegister, 5> getRegsRead(const ZydisDisassembledI
         }
     }
 
+    const auto remapReg = [](auto& oldReg) {
+        if (oldReg == ZYDIS_REGISTER_AH)
+            return ZYDIS_REGISTER_AX;
+        if (oldReg == ZYDIS_REGISTER_BH)
+            return ZYDIS_REGISTER_BX;
+        if (oldReg == ZYDIS_REGISTER_CH)
+            return ZYDIS_REGISTER_CX;
+        if (oldReg == ZYDIS_REGISTER_DH)
+            return ZYDIS_REGISTER_DX;
+        return oldReg;
+    };
+
     sfl::small_flat_map<ZydisRegister, ZydisRegister, 5> regMap;
     // Some registers may overlap, we have to turn them into a single register with largest size encountered.
     for (const auto& reg : regs)
     {
         const auto bigReg = ZydisRegisterGetLargestEnclosing(instr.info.machine_mode, reg);
+        auto newReg = remapReg(reg);
         if (auto it = regMap.find(bigReg); it != regMap.end())
         {
-            if (ZydisRegisterGetWidth(instr.info.machine_mode, reg)
+            if (ZydisRegisterGetWidth(instr.info.machine_mode, newReg)
                 > ZydisRegisterGetWidth(instr.info.machine_mode, it->second))
             {
                 // Pick bigger.
-                it->second = reg;
+                it->second = newReg;
             }
         }
         else
-            regMap[bigReg] = reg;
+            regMap[bigReg] = newReg;
     }
 
     regs.clear();
