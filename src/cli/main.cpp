@@ -890,7 +890,7 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_LEA);
+    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_SUB);
 
     Logging::startProgress("Building instructions");
 
@@ -921,11 +921,11 @@ int main()
 
     Logging::endProgress();
 
-    // Sort the groups by instruction string.
+    // Sort the groups by instruction operand width.
     std::sort(testGroups.begin(), testGroups.end(), [](const auto& a, const auto& b) {
         const auto instA = disassembleInstruction(a.instrData, a.address);
         const auto instB = disassembleInstruction(b.instrData, b.address);
-        return std::strcmp(instA.text, instB.text) < 0;
+        return instA.info.operand_width < instB.info.operand_width;
     });
 
     // Group the test cases by instruction.
