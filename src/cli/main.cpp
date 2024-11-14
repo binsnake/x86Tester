@@ -194,10 +194,20 @@ static std::uint32_t getFlagsModified(const ZydisDisassembledInstruction& instr)
 {
     std::uint32_t flags = 0;
     flags |= instr.info.cpu_flags->modified;
-    // TODO: We have to handle those different. For now, we just ignore them.
-    // flags |= instr.info.cpu_flags->undefined;
-    // flags |= instr.info.cpu_flags->set_0;
-    // flags |= instr.info.cpu_flags->set_1;
+    return flags;
+}
+
+static std::uint32_t getFlagsSet0(const ZydisDisassembledInstruction& instr)
+{
+    std::uint32_t flags = 0;
+    flags |= instr.info.cpu_flags->set_0;
+    return flags;
+}
+
+static std::uint32_t getFlagsSet1(const ZydisDisassembledInstruction& instr)
+{
+    std::uint32_t flags = 0;
+    flags |= instr.info.cpu_flags->set_1;
     return flags;
 }
 
@@ -213,6 +223,8 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
     const auto regsRead = getRegsRead(instr);
     const auto regsModified = getRegsModified(instr);
     const auto flagsModified = getFlagsModified(instr);
+    const auto flagsSet1 = getFlagsSet1(instr);
+    const auto flagsSet0 = getFlagsSet0(instr);
 
     std::vector<TestBitInfo> matrix;
 
@@ -229,10 +241,15 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
     bool rightInputZero = false;
     bool resultAlwaysZero = false;
     bool firstBitAlwaysZero = false;
+    bool inputIsImmediate = false;
 
-    if (ops[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE && ops[1].imm.value.s == 0)
+    if (ops[1].type == ZYDIS_OPERAND_TYPE_IMMEDIATE)
     {
-        rightInputZero = true;
+        inputIsImmediate = true;
+        if (ops[1].imm.value.s == 0)
+        {
+            rightInputZero = true;
+        }
     }
 
     // Enhanced semantic checks for specific instructions
@@ -242,6 +259,10 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
         case ZYDIS_MNEMONIC_CMP:
         case ZYDIS_MNEMONIC_XOR:
             resultAlwaysZero = regDestAndSrcSame;
+            break;
+        case ZYDIS_MNEMONIC_AND:
+        case ZYDIS_MNEMONIC_TEST:
+            resultAlwaysZero = rightInputZero;
             break;
         case ZYDIS_MNEMONIC_ADD:
             firstBitAlwaysZero = regDestAndSrcSame;
@@ -278,48 +299,62 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
     for (std::size_t i = 0; i < 32; ++i)
     {
         const auto flag = 1U << i;
-        if ((flagsModified & flag) != 0)
+
+        if (!inputIsImmediate)
         {
-            bool testFlagZero = true;
-            bool testFlagOne = true;
+            if ((flagsModified & flag) != 0)
+            {
+                bool testFlagZero = true;
+                bool testFlagOne = true;
 
-            // Additional checks for specific flags based on instruction type.
-            if (flag == ZYDIS_CPUFLAG_ZF)
-            {
-                testFlagZero = !resultAlwaysZero;
-            }
-            if (flag == ZYDIS_CPUFLAG_CF)
-            {
-                testFlagOne = !resultAlwaysZero && !rightInputZero;
-            }
-            if (flag == ZYDIS_CPUFLAG_OF)
-            {
-                testFlagOne = !regDestAndSrcSame && !rightInputZero;
-            }
-            if (flag == ZYDIS_CPUFLAG_PF)
-            {
-                testFlagZero = !resultAlwaysZero;
-            }
-            if (flag == ZYDIS_CPUFLAG_AF)
-            {
-                testFlagOne = !resultAlwaysZero && !rightInputZero;
-            }
-            if (flag == ZYDIS_CPUFLAG_SF)
-            {
-                testFlagOne = !resultAlwaysZero;
-            }
+                // Additional checks for specific flags based on instruction type.
+                if (flag == ZYDIS_CPUFLAG_ZF)
+                {
+                    testFlagZero = !resultAlwaysZero;
+                }
+                if (flag == ZYDIS_CPUFLAG_CF)
+                {
+                    testFlagOne = !resultAlwaysZero && !rightInputZero;
+                }
+                if (flag == ZYDIS_CPUFLAG_OF)
+                {
+                    testFlagOne = !regDestAndSrcSame && !rightInputZero;
+                }
+                if (flag == ZYDIS_CPUFLAG_PF)
+                {
+                    testFlagZero = !resultAlwaysZero;
+                }
+                if (flag == ZYDIS_CPUFLAG_AF)
+                {
+                    testFlagOne = !resultAlwaysZero && !rightInputZero;
+                }
+                if (flag == ZYDIS_CPUFLAG_SF)
+                {
+                    testFlagOne = !resultAlwaysZero;
+                }
 
-            // Expect 0 if possible.
-            if (testFlagZero)
-            {
-                matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 0 });
-            }
+                // Expect 0 if possible.
+                if (testFlagZero)
+                {
+                    matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 0 });
+                }
 
-            // Expect 1 if possible.
-            if (testFlagOne)
-            {
-                matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 1 });
+                // Expect 1 if possible.
+                if (testFlagOne)
+                {
+                    matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 1 });
+                }
             }
+        }
+
+        if ((flagsSet0 & flag) != 0)
+        {
+            matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 0 });
+        }
+
+        if ((flagsSet1 & flag) != 0)
+        {
+            matrix.push_back({ ExceptionType::None, ZYDIS_REGISTER_FLAGS, static_cast<std::uint16_t>(i), 1 });
         }
     }
 
@@ -616,7 +651,7 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
                 return;
             }
 
-                ExceptionType exceptionType = ExceptionType::None;
+            ExceptionType exceptionType = ExceptionType::None;
             if (auto status = ctx.getExecutionStatus(); status != Execution::ExecutionStatus::Success)
             {
                 switch (status)
