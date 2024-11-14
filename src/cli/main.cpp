@@ -289,10 +289,34 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
     for (auto& regModified : regsModified)
     {
         const auto regSize = ZydisRegisterGetWidth(instr.info.machine_mode, regModified);
+
+        auto maxBits = regSize;
+        switch (instr.info.mnemonic)
+        {
+            case ZYDIS_MNEMONIC_SETB:
+            case ZYDIS_MNEMONIC_SETBE:
+            case ZYDIS_MNEMONIC_SETL:
+            case ZYDIS_MNEMONIC_SETLE:
+            case ZYDIS_MNEMONIC_SETNB:
+            case ZYDIS_MNEMONIC_SETNBE:
+            case ZYDIS_MNEMONIC_SETNL:
+            case ZYDIS_MNEMONIC_SETNLE:
+            case ZYDIS_MNEMONIC_SETNO:
+            case ZYDIS_MNEMONIC_SETNP:
+            case ZYDIS_MNEMONIC_SETNS:
+            case ZYDIS_MNEMONIC_SETNZ:
+            case ZYDIS_MNEMONIC_SETO:
+            case ZYDIS_MNEMONIC_SETP:
+            case ZYDIS_MNEMONIC_SETS:
+            case ZYDIS_MNEMONIC_SETZ:
+                maxBits = 1;
+                break;
+        }
+
         for (std::uint16_t bitPos = 0; bitPos < regSize; ++bitPos)
         {
             bool testZero = testRegZero;
-            bool testOne = !resultAlwaysZero;
+            bool testOne = !resultAlwaysZero && bitPos < maxBits;
 
             if (instr.info.mnemonic == ZYDIS_MNEMONIC_MOV && inputIsImmediate)
             {
@@ -848,8 +872,11 @@ int main()
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
     const auto filter = Generator::Filter{}.addMnemonics(
-        ZYDIS_MNEMONIC_TEST, ZYDIS_MNEMONIC_AND, ZYDIS_MNEMONIC_CMP, ZYDIS_MNEMONIC_MOV, ZYDIS_MNEMONIC_SUB, ZYDIS_MNEMONIC_XOR,
-        ZYDIS_MNEMONIC_OR, ZYDIS_MNEMONIC_ADD);
+        ZYDIS_MNEMONIC_SETB, ZYDIS_MNEMONIC_SETBE, ZYDIS_MNEMONIC_SETL, ZYDIS_MNEMONIC_SETLE, ZYDIS_MNEMONIC_SETNB,
+        ZYDIS_MNEMONIC_SETNBE, ZYDIS_MNEMONIC_SETNL, ZYDIS_MNEMONIC_SETNLE, ZYDIS_MNEMONIC_SETNO, ZYDIS_MNEMONIC_SETNP,
+        ZYDIS_MNEMONIC_SETNS, ZYDIS_MNEMONIC_SETNZ, ZYDIS_MNEMONIC_SETO, ZYDIS_MNEMONIC_SETP, ZYDIS_MNEMONIC_SETS,
+        ZYDIS_MNEMONIC_SETSSBSY, ZYDIS_MNEMONIC_SETZ);
+    // Total test cases: 322332
 
     Logging::startProgress("Building instructions");
 
