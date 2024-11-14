@@ -267,6 +267,9 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
         case ZYDIS_MNEMONIC_ADD:
             firstBitAlwaysZero = regDestAndSrcSame;
             break;
+        case ZYDIS_MNEMONIC_MOV:
+            resultAlwaysZero = rightInputZero;
+            break;
     }
 
     // Generate test matrix for registers
@@ -277,6 +280,23 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
         {
             bool testZero = testRegZero;
             bool testOne = !resultAlwaysZero;
+
+            if (instr.info.mnemonic == ZYDIS_MNEMONIC_MOV && inputIsImmediate)
+            {
+                // We know the input value so we will expect those bits.
+                testZero = (ops[1].imm.value.u & (1ULL << bitPos)) == 0;
+                testOne = (ops[1].imm.value.u & (1ULL << bitPos)) != 0;
+            }
+            else if (instr.info.mnemonic == ZYDIS_MNEMONIC_OR && inputIsImmediate)
+            {
+                // If the input bit is not zero then the output bit will never be zero.
+                testZero = (ops[1].imm.value.u & (1ULL << bitPos)) == 0;
+            }
+            else if (instr.info.mnemonic == ZYDIS_MNEMONIC_AND && inputIsImmediate)
+            {
+                // If the input bit is zero then the output bit will never be one.
+                testOne = (ops[1].imm.value.u & (1ULL << bitPos)) != 0;
+            }
 
             // Expect 0 if possible.
             if (testZero)
@@ -598,12 +618,26 @@ static std::vector<Generator::InputGenerator> setupInputGenerators(
     return generators;
 }
 
+static bool isInputFromImmediate(const ZydisDisassembledInstruction& instr)
+{
+    for (std::size_t i = 0; i < instr.info.operand_count; ++i)
+    {
+        const auto& op = instr.operands[i];
+        if (op.type == ZYDIS_OPERAND_TYPE_IMMEDIATE)
+            return true;
+    }
+    return false;
+}
+
 static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
 {
     auto& instrData = testCase.instrData;
 
     ZydisDisassembledInstruction instr{};
     ZydisDisassembleIntel(mode, 0, instrData.data(), instrData.size(), &instr);
+
+    const auto isInputImmediate = isInputFromImmediate(instr);
+    const auto maxAttempts = isInputImmediate ? kAbortTestCaseThreshold / 3 : kAbortTestCaseThreshold;
 
     const auto regsRead = getRegsRead(instr);
     const auto flagsRead = getFlagsRead(instr);
@@ -685,7 +719,7 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
 
             iteration++;
 
-            if (iteration > kAbortTestCaseThreshold)
+            if (iteration > maxAttempts)
             {
                 // Probably impossible.
                 Logging::println("Test probably impossible: {} ; {}", instr.text, getTestInfo(testBitInfo));
@@ -800,7 +834,9 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZydisMnemonic::ZYDIS_MNEMONIC_TEST);
+    const auto filter = Generator::Filter{}.addMnemonics(
+        ZYDIS_MNEMONIC_TEST, ZYDIS_MNEMONIC_AND, ZYDIS_MNEMONIC_CMP, ZYDIS_MNEMONIC_MOV, ZYDIS_MNEMONIC_SUB, ZYDIS_MNEMONIC_XOR,
+        ZYDIS_MNEMONIC_OR, ZYDIS_MNEMONIC_ADD);
 
     Logging::startProgress("Building instructions");
 
