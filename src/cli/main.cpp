@@ -334,6 +334,11 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
                 // If the input bit is zero then the output bit will never be one.
                 testOne = (ops[1].imm.value.u & (1ULL << bitPos)) != 0;
             }
+            else if (instr.info.mnemonic == ZYDIS_MNEMONIC_BTR && inputIsImmediate)
+            {
+                // BTR is just reg[bit] = 0
+                testOne = ((ops[1].imm.value.u % instr.info.operand_width) != bitPos);
+            }
 
             // Expect 0 if possible.
             if (testZero)
@@ -871,12 +876,7 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(
-        ZYDIS_MNEMONIC_SETB, ZYDIS_MNEMONIC_SETBE, ZYDIS_MNEMONIC_SETL, ZYDIS_MNEMONIC_SETLE, ZYDIS_MNEMONIC_SETNB,
-        ZYDIS_MNEMONIC_SETNBE, ZYDIS_MNEMONIC_SETNL, ZYDIS_MNEMONIC_SETNLE, ZYDIS_MNEMONIC_SETNO, ZYDIS_MNEMONIC_SETNP,
-        ZYDIS_MNEMONIC_SETNS, ZYDIS_MNEMONIC_SETNZ, ZYDIS_MNEMONIC_SETO, ZYDIS_MNEMONIC_SETP, ZYDIS_MNEMONIC_SETS,
-        ZYDIS_MNEMONIC_SETSSBSY, ZYDIS_MNEMONIC_SETZ);
-    // Total test cases: 322332
+    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_BTR);
 
     Logging::startProgress("Building instructions");
 

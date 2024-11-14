@@ -15,7 +15,11 @@ namespace x86Tester::Generator
         {
             std::vector<T> numbers;
 
-            numbers.push_back(0);
+            // Add first 64 numbers, important for shifts and rotates.
+            for (T i = 0; i < 64; i++)
+            {
+                numbers.push_back(i);
+            }
 
             // Add all bits set.
             {
