@@ -24,7 +24,7 @@ namespace x86Tester::Utils
                   << "\n";
     }
 
-    std::string toHexString(std::span<const uint8_t> bytes)
+    std::string hexEncode(std::span<const uint8_t> bytes)
     {
         std::string out;
         out.reserve(bytes.size() * 2);

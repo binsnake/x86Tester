@@ -564,7 +564,7 @@ static void advanceInputs(
         std::string inputsStr;
         for (const auto& [reg, data] : regData)
         {
-            inputsStr += std::format("{}=#{} ", ZydisRegisterGetString(reg), Utils::toHexString(data));
+            inputsStr += std::format("{}=#{} ", ZydisRegisterGetString(reg), Utils::hexEncode(data));
         }
 
         Logging::println("Test: {} - Inputs: {}", instr.text, inputsStr);
@@ -846,7 +846,7 @@ static bool serializeTestEntries(ZydisMnemonic mnemonic, const std::vector<Instr
         const auto instr = disassembleInstruction(entry.instrData, entry.address);
 
         std::print(
-            file, "instr:0x{:X};#{};{};{}\n", entry.address, Utils::toHexString(entry.instrData), instr.text,
+            file, "instr:0x{:X};#{};{};{}\n", entry.address, Utils::hexEncode(entry.instrData), instr.text,
             entry.entries.size());
         for (const auto& entry : entry.entries)
         {
@@ -855,28 +855,38 @@ static bool serializeTestEntries(ZydisMnemonic mnemonic, const std::vector<Instr
             for (const auto& [reg, data] : entry.inputRegs)
             {
                 std::print(
-                    file, "{}{};#{}", numIn > 0 ? ";" : "", ZydisRegisterGetString(reg),
-                    Utils::toHexString({ data.data(), data.size() }));
+                    file, "{}{}:#{}", numIn > 0 ? "," : "", ZydisRegisterGetString(reg),
+                    Utils::hexEncode({ data.data(), data.size() }));
                 numIn++;
             }
+
             if (entry.inputFlags)
-                std::print(file, "{}{};0x{:08X}", numIn > 0 ? ";" : "", "flags", *entry.inputFlags);
+            {
+                std::array<std::uint8_t, 4> flagsHex{};
+                std::memcpy(flagsHex.data(), &entry.inputFlags.value(), 4);
+                std::print(file, "{}flags:#{}", numIn > 0 ? "," : "", Utils::hexEncode(flagsHex));
+            }
 
             std::print(file, "{}out:", numIn > 0 ? "|" : "");
             auto numOut = 0;
             for (const auto& [reg, data] : entry.outputRegs)
             {
                 std::print(
-                    file, "{}{};#{}", numOut > 0 ? ";" : "", ZydisRegisterGetString(reg),
-                    Utils::toHexString({ data.data(), data.size() }));
+                    file, "{}{}:#{}", numOut > 0 ? "," : "", ZydisRegisterGetString(reg),
+                    Utils::hexEncode({ data.data(), data.size() }));
                 numOut++;
             }
+
             if (entry.outputFlags)
-                std::print(file, "{}{};0x{:08X}", numOut > 0 ? ";" : "", "flags", *entry.outputFlags);
+            {
+                std::array<std::uint8_t, 4> flagsHex{};
+                std::memcpy(flagsHex.data(), &entry.outputFlags.value(), 4);
+                std::print(file, "{}flags:#{}", numOut > 0 ? "," : "", Utils::hexEncode(flagsHex));
+            }
 
             if (entry.exceptionType)
             {
-                std::print(file, "|{};{}", "exception", getExceptionString(*entry.exceptionType));
+                std::print(file, "|exception:{}", getExceptionString(*entry.exceptionType));
             }
 
             std::print(file, "\n");
@@ -890,7 +900,7 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_SUB);
+    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_ADD, ZYDIS_MNEMONIC_SUB);
 
     Logging::startProgress("Building instructions");
 
