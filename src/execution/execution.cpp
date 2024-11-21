@@ -367,7 +367,7 @@ namespace x86Tester::Execution
         }
 
         return ctx;
-    }
+    }    
 
     bool setRegBytes(Context* ctx, ZydisRegister reg, std::span<const std::uint8_t> data)
     {
@@ -418,7 +418,41 @@ namespace x86Tester::Execution
             case ZYDIS_REGISTER_RIP:
                 return setRegValue(ctx->threadContext.Rip);
             case ZYDIS_REGISTER_RFLAGS:
+                [[fallthrough]];
+            case ZYDIS_REGISTER_EFLAGS:
                 return setRegValue(ctx->threadContext.EFlags);
+            case ZYDIS_REGISTER_XMM0:
+                return setRegValue(ctx->threadContext.Xmm0);
+            case ZYDIS_REGISTER_XMM1:
+                return setRegValue(ctx->threadContext.Xmm1);
+            case ZYDIS_REGISTER_XMM2:
+                return setRegValue(ctx->threadContext.Xmm2);
+            case ZYDIS_REGISTER_XMM3:
+                return setRegValue(ctx->threadContext.Xmm3);
+            case ZYDIS_REGISTER_XMM4:
+                return setRegValue(ctx->threadContext.Xmm4);
+            case ZYDIS_REGISTER_XMM5:
+                return setRegValue(ctx->threadContext.Xmm5);
+            case ZYDIS_REGISTER_XMM6:
+                return setRegValue(ctx->threadContext.Xmm6);
+            case ZYDIS_REGISTER_XMM7:
+                return setRegValue(ctx->threadContext.Xmm7);
+            case ZYDIS_REGISTER_XMM8:
+                return setRegValue(ctx->threadContext.Xmm8);
+            case ZYDIS_REGISTER_XMM9:
+                return setRegValue(ctx->threadContext.Xmm9);
+            case ZYDIS_REGISTER_XMM10:
+                return setRegValue(ctx->threadContext.Xmm10);
+            case ZYDIS_REGISTER_XMM11:
+                return setRegValue(ctx->threadContext.Xmm11);
+            case ZYDIS_REGISTER_XMM12:
+                return setRegValue(ctx->threadContext.Xmm12);
+            case ZYDIS_REGISTER_XMM13:
+                return setRegValue(ctx->threadContext.Xmm13);
+            case ZYDIS_REGISTER_XMM14:
+                return setRegValue(ctx->threadContext.Xmm14);
+            case ZYDIS_REGISTER_XMM15:
+                return setRegValue(ctx->threadContext.Xmm15);
         }
 
         assert(false);
@@ -468,7 +502,41 @@ namespace x86Tester::Execution
             case ZYDIS_REGISTER_RIP:
                 return getRegValue(ctx->threadContext.Rip);
             case ZYDIS_REGISTER_RFLAGS:
+                [[fallthrough]];
+            case ZYDIS_REGISTER_EFLAGS:
                 return getRegValue(ctx->threadContext.EFlags);
+            case ZYDIS_REGISTER_XMM0:
+                return getRegValue(ctx->threadContext.Xmm0);
+            case ZYDIS_REGISTER_XMM1:
+                return getRegValue(ctx->threadContext.Xmm1);
+            case ZYDIS_REGISTER_XMM2:
+                return getRegValue(ctx->threadContext.Xmm2);
+            case ZYDIS_REGISTER_XMM3:
+                return getRegValue(ctx->threadContext.Xmm3);
+            case ZYDIS_REGISTER_XMM4:
+                return getRegValue(ctx->threadContext.Xmm4);
+            case ZYDIS_REGISTER_XMM5:
+                return getRegValue(ctx->threadContext.Xmm5);
+            case ZYDIS_REGISTER_XMM6:
+                return getRegValue(ctx->threadContext.Xmm6);
+            case ZYDIS_REGISTER_XMM7:
+                return getRegValue(ctx->threadContext.Xmm7);
+            case ZYDIS_REGISTER_XMM8:
+                return getRegValue(ctx->threadContext.Xmm8);
+            case ZYDIS_REGISTER_XMM9:
+                return getRegValue(ctx->threadContext.Xmm9);
+            case ZYDIS_REGISTER_XMM10:
+                return getRegValue(ctx->threadContext.Xmm10);
+            case ZYDIS_REGISTER_XMM11:
+                return getRegValue(ctx->threadContext.Xmm11);
+            case ZYDIS_REGISTER_XMM12:
+                return getRegValue(ctx->threadContext.Xmm12);
+            case ZYDIS_REGISTER_XMM13:
+                return getRegValue(ctx->threadContext.Xmm13);
+            case ZYDIS_REGISTER_XMM14:
+                return getRegValue(ctx->threadContext.Xmm14);
+            case ZYDIS_REGISTER_XMM15:
+                return getRegValue(ctx->threadContext.Xmm15);
         }
 
         assert(false);

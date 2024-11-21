@@ -122,6 +122,22 @@ static sfl::static_vector<ZydisRegister, 5> getRegsModified(const ZydisDisassemb
     return sortRegs(regs);
 }
 
+static ZydisRegister getRootReg(ZydisMachineMode mode, ZydisRegister reg)
+{
+    const auto regCls = ZydisRegisterGetClass(reg);
+    switch (regCls)
+    {
+        // General purpose registers
+        case ZYDIS_REGCLASS_GPR8:
+        case ZYDIS_REGCLASS_GPR16:
+        case ZYDIS_REGCLASS_GPR32:
+        case ZYDIS_REGCLASS_GPR64:
+        case ZYDIS_REGCLASS_FLAGS:
+            return ZydisRegisterGetLargestEnclosing(mode, reg);
+    }
+    return reg;
+}
+
 static sfl::static_vector<ZydisRegister, 5> getRegsRead(const ZydisDisassembledInstruction& instr)
 {
     sfl::small_flat_set<ZydisRegister, 5> regs;
@@ -157,7 +173,7 @@ static sfl::static_vector<ZydisRegister, 5> getRegsRead(const ZydisDisassembledI
     // Some registers may overlap, we have to turn them into a single register with largest size encountered.
     for (const auto& reg : regs)
     {
-        const auto bigReg = ZydisRegisterGetLargestEnclosing(instr.info.machine_mode, reg);
+        const auto bigReg = getRootReg(instr.info.machine_mode, reg);
         auto newReg = remapReg(reg);
         if (auto it = regMap.find(bigReg); it != regMap.end())
         {
@@ -470,7 +486,7 @@ static void advanceInputs(
     sfl::small_flat_set<ZydisRegister, 5> regsReadBig;
     for (const auto& reg : regsRead)
     {
-        const auto bigReg = ZydisRegisterGetLargestEnclosing(instr.info.machine_mode, reg);
+        const auto bigReg = getRootReg(instr.info.machine_mode, reg);
         regsReadBig.insert(bigReg);
     }
 
@@ -501,7 +517,7 @@ static void advanceInputs(
         std::uint8_t regBuf[256]{};
         const std::size_t usedRegBitSize = ZydisRegisterGetWidth(instr.info.machine_mode, reg);
         const std::size_t usedRegByteSize = usedRegBitSize / 8;
-        const auto bigReg = ZydisRegisterGetLargestEnclosing(instr.info.machine_mode, reg);
+        const auto bigReg = getRootReg(instr.info.machine_mode, reg);
         const std::size_t bigRegBitSize = ZydisRegisterGetWidth(instr.info.machine_mode, bigReg);
         const std::size_t bigRegByteSize = bigRegBitSize / 8;
 
@@ -590,7 +606,7 @@ static void clearOutput(Execution::ScopedContext& ctx, const TestBitInfo& testBi
                 regBuf[i + regOffset] = 0;
         }
 
-        const auto bigReg = ZydisRegisterGetLargestEnclosing(ZYDIS_MACHINE_MODE_LONG_64, testBitInfo.reg);
+        const auto bigReg = getRootReg(ZYDIS_MACHINE_MODE_LONG_64, testBitInfo.reg);
         const std::size_t bigRegSize = ZydisRegisterGetWidth(ZYDIS_MACHINE_MODE_LONG_64, bigReg) / 8;
 
         ctx.setRegBytes(bigReg, std::span<const std::uint8_t>{ regBuf, bigRegSize });
@@ -614,7 +630,7 @@ static bool checkOutputs(
     Execution::ScopedContext& ctx, const ZydisDisassembledInstruction& instr, const TestBitInfo& testBitInfo,
     TestCaseEntry& testEntry)
 {
-    const auto bigReg = ZydisRegisterGetLargestEnclosing(ZYDIS_MACHINE_MODE_LONG_64, testBitInfo.reg);
+    const auto bigReg = getRootReg(ZYDIS_MACHINE_MODE_LONG_64, testBitInfo.reg);
 
     const auto regData = ctx.getRegBytes(bigReg);
     const auto regOffset = getRegOffset(testBitInfo.reg);
@@ -632,7 +648,7 @@ static bool checkOutputs(
 
     for (auto regModified : regsModified)
     {
-        const auto bigReg = ZydisRegisterGetLargestEnclosing(instr.info.machine_mode, regModified);
+        const auto bigReg = getRootReg(instr.info.machine_mode, regModified);
         const auto bigSize = ZydisRegisterGetWidth(instr.info.machine_mode, bigReg);
 
         const auto regData = ctx.getRegBytes(bigReg);
@@ -900,7 +916,7 @@ int main()
 {
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_ADD, ZYDIS_MNEMONIC_SUB);
+    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_ADDSS);
 
     Logging::startProgress("Building instructions");
 

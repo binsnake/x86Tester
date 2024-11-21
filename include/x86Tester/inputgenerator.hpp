@@ -338,9 +338,18 @@ namespace x86Tester::Generator
                     nextStrat = true;
                 std::memcpy(_data.data(), &value, sizeof(value));
             }
-            else
+            else if (_maxBits == 128)
             {
-                assert(false);
+                const auto value1 = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
+                if (++_counter >= std::size(Detail::kMagicNumbers64b))
+                    nextStrat = true;
+
+                const auto value2 = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
+                if (++_counter >= std::size(Detail::kMagicNumbers64b))
+                    nextStrat = true;
+
+                std::memcpy(_data.data(), &value1, sizeof(value1));
+                std::memcpy(_data.data() + sizeof(value1), &value2, sizeof(value2));
             }
 
             if (nextStrat)
