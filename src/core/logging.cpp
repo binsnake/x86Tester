@@ -12,8 +12,9 @@ namespace x86Tester::Logging
     static auto _nextReport = clock::now();
     static double _progress = 0.0;
     static size_t _progressLineLen = 0;
+    static clock::time_point _startTime;
 
-    static void printProgress(const char* name, double percentage, bool forcePrint)
+    static void printProgress(std::string_view name, double percentage, bool forcePrint)
     {
         using namespace std::chrono_literals;
 
@@ -34,39 +35,32 @@ namespace x86Tester::Logging
         int rpad = PBWIDTH - lpad;
         _lastProgress = val;
 
-        int namepad = 20 - static_cast<int>(std::strlen(name));
+        int namepad = 20 - static_cast<int>(name.size());
 
-        auto line = std::format("\r{:25} {:3d}% [{:40}]", name, val, std::string_view(PBSTR, lpad));
+        std::string line;
+        line = std::format("\r{:25} {:3d}% [{:40}]", name, val, std::string_view(PBSTR, lpad));
+
         std::print("{}", line);
         std::fflush(stdout);
 
         _progressLineLen = line.size();
     }
 
-    void printProgress(const char* name, size_t val, size_t max)
-    {
-        return printProgress(name, static_cast<double>(val) / max, false);
-    }
-
-    void startProgress(const char* name)
-    {
-        _progressName = name;
-        _inProgress = true;
-        _lastProgress = -1;
-        _progress = 0.0;
-        printProgress(_progressName.c_str(), _progress, true);
-    }
-
     void updateProgress(size_t val, size_t max)
     {
         _progress = static_cast<double>(val) / max;
-        printProgress(_progressName.c_str(), _progress, false);
+        printProgress(_progressName, _progress, false);
     }
 
     void endProgress()
     {
         _inProgress = false;
-        std::println();
+
+        auto endTime = clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::seconds>(endTime - _startTime);
+        std::println(
+            "\r{}, completed in {}.{:{}}", _progressName, duration, "",
+            _progressName.size() < 72 ? 72 - _progressName.size() : 1);
     }
 
     namespace Detail
@@ -77,11 +71,22 @@ namespace x86Tester::Logging
             {
                 size_t spaces = msg.size() < _progressLineLen ? _progressLineLen - msg.size() : 0;
                 std::println("\r{}{}", msg, std::string(spaces, ' '));
-                printProgress(_progressName.c_str(), _progress, true);
+                printProgress(_progressName, _progress, true);
             }
             else
                 std::println("{}", msg);
         }
+
+        void startProgress(const std::string_view msg)
+        {
+            _progressName = std::string{ msg };
+            _inProgress = true;
+            _lastProgress = -1;
+            _progress = 0.0;
+            _startTime = clock::now();
+            printProgress(_progressName, _progress, true);
+        }
+
     } // namespace Detail
 
 } // namespace x86Tester::Logging

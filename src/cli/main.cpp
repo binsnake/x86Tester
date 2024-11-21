@@ -914,79 +914,85 @@ static bool serializeTestEntries(ZydisMnemonic mnemonic, const std::vector<Instr
 
 int main()
 {
+    // TODO: Rework this and extract all possible mnemonics from the filter and iterate over that instead.
+    const ZydisMnemonic mnemonics[] = { ZYDIS_MNEMONIC_ADDSS, ZYDIS_MNEMONIC_SUBSS };
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
-    const auto filter = Generator::Filter{}.addMnemonics(ZYDIS_MNEMONIC_ADDSS);
-
-    Logging::startProgress("Building instructions");
-
-    const auto instrs = Generator::buildInstructions(
-        ZYDIS_MACHINE_MODE_LONG_64, filter, true, [](auto curVal, auto maxVal) { Logging::updateProgress(curVal, maxVal); });
-
-    Logging::endProgress();
-
-    const auto numInstrs = instrs.entryOffsets.size();
-    Logging::println("Total instructions: {}", numInstrs);
-
-    Logging::startProgress("Generating tests");
-
-    std::vector<InstrTestGroup> testGroups;
-    std::mutex mtx;
-    std::atomic<size_t> curInstr = 0;
-
-    instrs.forEachParallel([&](auto&& instrData) {
-        //
-        InstrTestGroup testCase = generateInstructionTestData(mode, instrData);
-        if (!testCase.entries.empty())
-        {
-            std::lock_guard lock(mtx);
-            testGroups.push_back(std::move(testCase));
-        }
-        Logging::updateProgress(++curInstr, numInstrs);
-    });
-
-    Logging::endProgress();
-
-    // Sort the groups by instruction operand width.
-    std::sort(testGroups.begin(), testGroups.end(), [](const auto& a, const auto& b) {
-        const auto instA = disassembleInstruction(a.instrData, a.address);
-        const auto instB = disassembleInstruction(b.instrData, b.address);
-        return instA.info.operand_width < instB.info.operand_width;
-    });
-
-    // Group the test cases by instruction.
-    std::map<ZydisMnemonic, std::vector<InstrTestGroup>> testGroupsMap;
-    for (auto& testGroup : testGroups)
+    for (const auto mnemonic : mnemonics)
     {
-        const auto instr = disassembleInstruction(testGroup.instrData, testGroup.address);
+        const auto filter = Generator::Filter{}.addMnemonics(mnemonic);
 
-        auto it = testGroupsMap.find(instr.info.mnemonic);
-        if (it != testGroupsMap.end())
-        {
-            it->second.push_back(std::move(testGroup));
-            continue;
-        }
-        else
-        {
-            testGroupsMap.insert({ instr.info.mnemonic, { std::move(testGroup) } });
-        }
-    }
+        Logging::startProgress("Building \"{}\" instruction combinations", ZydisMnemonicGetString(mnemonic));
 
-    // Report results.
-    size_t totalTestEntries = 0;
-    for (const auto& [mnemonic, testGroups] : testGroupsMap)
-    {
+        const auto instrs = Generator::buildInstructions(
+            ZYDIS_MACHINE_MODE_LONG_64, filter, true,
+            [](auto curVal, auto maxVal) { Logging::updateProgress(curVal, maxVal); });
+
+        Logging::endProgress();
+
+        const auto numInstrs = instrs.entryOffsets.size();
+        Logging::println("Total instructions: {}", numInstrs);
+
+        Logging::startProgress("Generating tests");
+
+        std::vector<InstrTestGroup> testGroups;
+        std::mutex mtx;
+        std::atomic<size_t> curInstr = 0;
+
+        instrs.forEachParallel([&](auto&& instrData) {
+            //
+            InstrTestGroup testCase = generateInstructionTestData(mode, instrData);
+            if (!testCase.entries.empty())
+            {
+                std::lock_guard lock(mtx);
+                testGroups.push_back(std::move(testCase));
+            }
+            Logging::updateProgress(++curInstr, numInstrs);
+        });
+
+        Logging::endProgress();
+
+        // Sort the groups by instruction operand width.
+        std::sort(testGroups.begin(), testGroups.end(), [](const auto& a, const auto& b) {
+            const auto instA = disassembleInstruction(a.instrData, a.address);
+            const auto instB = disassembleInstruction(b.instrData, b.address);
+            return instA.info.operand_width < instB.info.operand_width;
+        });
+
+        // Group the test cases by instruction.
+        std::map<ZydisMnemonic, std::vector<InstrTestGroup>> testGroupsMap;
         for (auto& testGroup : testGroups)
         {
-            totalTestEntries += testGroup.entries.size();
-        }
-    }
-    Logging::println("Total test cases: {}", totalTestEntries);
+            const auto instr = disassembleInstruction(testGroup.instrData, testGroup.address);
 
-    // Save to file.
-    for (const auto& [mnemonic, testGroups] : testGroupsMap)
-    {
-        serializeTestEntries(mnemonic, { testGroups });
+            auto it = testGroupsMap.find(instr.info.mnemonic);
+            if (it != testGroupsMap.end())
+            {
+                it->second.push_back(std::move(testGroup));
+                continue;
+            }
+            else
+            {
+                testGroupsMap.insert({ instr.info.mnemonic, { std::move(testGroup) } });
+            }
+        }
+
+        // Report results.
+        size_t totalTestEntries = 0;
+        for (const auto& [mnemonic, testGroups] : testGroupsMap)
+        {
+            for (auto& testGroup : testGroups)
+            {
+                totalTestEntries += testGroup.entries.size();
+            }
+        }
+        Logging::println("Total test cases: {}", totalTestEntries);
+
+        // Save to file.
+        for (const auto& [mnemonic, testGroups] : testGroupsMap)
+        {
+            serializeTestEntries(mnemonic, { testGroups });
+        }
     }
 
     return EXIT_SUCCESS;
