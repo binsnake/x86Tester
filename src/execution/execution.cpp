@@ -367,180 +367,133 @@ namespace x86Tester::Execution
         }
 
         return ctx;
-    }    
-
-    bool setRegBytes(Context* ctx, ZydisRegister reg, std::span<const std::uint8_t> data)
-    {
-        auto setRegValue = [&](auto& dst) -> bool {
-            if (data.size() > sizeof(dst))
-            {
-                assert(false);
-                return false;
-            }
-            std::memcpy(&dst, data.data(), data.size());
-            return true;
-        };
-
-        switch (reg)
-        {
-            case ZYDIS_REGISTER_RAX:
-                return setRegValue(ctx->threadContext.Rax);
-            case ZYDIS_REGISTER_RCX:
-                return setRegValue(ctx->threadContext.Rcx);
-            case ZYDIS_REGISTER_RDX:
-                return setRegValue(ctx->threadContext.Rdx);
-            case ZYDIS_REGISTER_RBX:
-                return setRegValue(ctx->threadContext.Rbx);
-            case ZYDIS_REGISTER_RSP:
-                return setRegValue(ctx->threadContext.Rsp);
-            case ZYDIS_REGISTER_RBP:
-                return setRegValue(ctx->threadContext.Rbp);
-            case ZYDIS_REGISTER_RSI:
-                return setRegValue(ctx->threadContext.Rsi);
-            case ZYDIS_REGISTER_RDI:
-                return setRegValue(ctx->threadContext.Rdi);
-            case ZYDIS_REGISTER_R8:
-                return setRegValue(ctx->threadContext.R8);
-            case ZYDIS_REGISTER_R9:
-                return setRegValue(ctx->threadContext.R9);
-            case ZYDIS_REGISTER_R10:
-                return setRegValue(ctx->threadContext.R10);
-            case ZYDIS_REGISTER_R11:
-                return setRegValue(ctx->threadContext.R11);
-            case ZYDIS_REGISTER_R12:
-                return setRegValue(ctx->threadContext.R12);
-            case ZYDIS_REGISTER_R13:
-                return setRegValue(ctx->threadContext.R13);
-            case ZYDIS_REGISTER_R14:
-                return setRegValue(ctx->threadContext.R14);
-            case ZYDIS_REGISTER_R15:
-                return setRegValue(ctx->threadContext.R15);
-            case ZYDIS_REGISTER_RIP:
-                return setRegValue(ctx->threadContext.Rip);
-            case ZYDIS_REGISTER_RFLAGS:
-                [[fallthrough]];
-            case ZYDIS_REGISTER_EFLAGS:
-                return setRegValue(ctx->threadContext.EFlags);
-            case ZYDIS_REGISTER_XMM0:
-                return setRegValue(ctx->threadContext.Xmm0);
-            case ZYDIS_REGISTER_XMM1:
-                return setRegValue(ctx->threadContext.Xmm1);
-            case ZYDIS_REGISTER_XMM2:
-                return setRegValue(ctx->threadContext.Xmm2);
-            case ZYDIS_REGISTER_XMM3:
-                return setRegValue(ctx->threadContext.Xmm3);
-            case ZYDIS_REGISTER_XMM4:
-                return setRegValue(ctx->threadContext.Xmm4);
-            case ZYDIS_REGISTER_XMM5:
-                return setRegValue(ctx->threadContext.Xmm5);
-            case ZYDIS_REGISTER_XMM6:
-                return setRegValue(ctx->threadContext.Xmm6);
-            case ZYDIS_REGISTER_XMM7:
-                return setRegValue(ctx->threadContext.Xmm7);
-            case ZYDIS_REGISTER_XMM8:
-                return setRegValue(ctx->threadContext.Xmm8);
-            case ZYDIS_REGISTER_XMM9:
-                return setRegValue(ctx->threadContext.Xmm9);
-            case ZYDIS_REGISTER_XMM10:
-                return setRegValue(ctx->threadContext.Xmm10);
-            case ZYDIS_REGISTER_XMM11:
-                return setRegValue(ctx->threadContext.Xmm11);
-            case ZYDIS_REGISTER_XMM12:
-                return setRegValue(ctx->threadContext.Xmm12);
-            case ZYDIS_REGISTER_XMM13:
-                return setRegValue(ctx->threadContext.Xmm13);
-            case ZYDIS_REGISTER_XMM14:
-                return setRegValue(ctx->threadContext.Xmm14);
-            case ZYDIS_REGISTER_XMM15:
-                return setRegValue(ctx->threadContext.Xmm15);
-        }
-
-        assert(false);
-        return false;
     }
 
-    std::span<const uint8_t> getRegBytes(Context* ctx, ZydisRegister reg)
+    std::span<std::uint8_t> getContextReg(Context* ctx, ZydisRegister reg)
     {
-        auto getRegValue = [&](auto& src) -> std::span<const std::uint8_t> {
-            return std::span(reinterpret_cast<const std::uint8_t*>(&src), sizeof(src));
+        auto getRegData = [&](auto& dst) {
+            //
+            return std::span(reinterpret_cast<std::uint8_t*>(&dst), sizeof(dst));
         };
 
         switch (reg)
         {
             case ZYDIS_REGISTER_RAX:
-                return getRegValue(ctx->threadContext.Rax);
+                return getRegData(ctx->threadContext.Rax);
             case ZYDIS_REGISTER_RCX:
-                return getRegValue(ctx->threadContext.Rcx);
+                return getRegData(ctx->threadContext.Rcx);
             case ZYDIS_REGISTER_RDX:
-                return getRegValue(ctx->threadContext.Rdx);
+                return getRegData(ctx->threadContext.Rdx);
             case ZYDIS_REGISTER_RBX:
-                return getRegValue(ctx->threadContext.Rbx);
+                return getRegData(ctx->threadContext.Rbx);
             case ZYDIS_REGISTER_RSP:
-                return getRegValue(ctx->threadContext.Rsp);
+                return getRegData(ctx->threadContext.Rsp);
             case ZYDIS_REGISTER_RBP:
-                return getRegValue(ctx->threadContext.Rbp);
+                return getRegData(ctx->threadContext.Rbp);
             case ZYDIS_REGISTER_RSI:
-                return getRegValue(ctx->threadContext.Rsi);
+                return getRegData(ctx->threadContext.Rsi);
             case ZYDIS_REGISTER_RDI:
-                return getRegValue(ctx->threadContext.Rdi);
+                return getRegData(ctx->threadContext.Rdi);
             case ZYDIS_REGISTER_R8:
-                return getRegValue(ctx->threadContext.R8);
+                return getRegData(ctx->threadContext.R8);
             case ZYDIS_REGISTER_R9:
-                return getRegValue(ctx->threadContext.R9);
+                return getRegData(ctx->threadContext.R9);
             case ZYDIS_REGISTER_R10:
-                return getRegValue(ctx->threadContext.R10);
+                return getRegData(ctx->threadContext.R10);
             case ZYDIS_REGISTER_R11:
-                return getRegValue(ctx->threadContext.R11);
+                return getRegData(ctx->threadContext.R11);
             case ZYDIS_REGISTER_R12:
-                return getRegValue(ctx->threadContext.R12);
+                return getRegData(ctx->threadContext.R12);
             case ZYDIS_REGISTER_R13:
-                return getRegValue(ctx->threadContext.R13);
+                return getRegData(ctx->threadContext.R13);
             case ZYDIS_REGISTER_R14:
-                return getRegValue(ctx->threadContext.R14);
+                return getRegData(ctx->threadContext.R14);
             case ZYDIS_REGISTER_R15:
-                return getRegValue(ctx->threadContext.R15);
+                return getRegData(ctx->threadContext.R15);
             case ZYDIS_REGISTER_RIP:
-                return getRegValue(ctx->threadContext.Rip);
+                return getRegData(ctx->threadContext.Rip);
             case ZYDIS_REGISTER_RFLAGS:
                 [[fallthrough]];
             case ZYDIS_REGISTER_EFLAGS:
-                return getRegValue(ctx->threadContext.EFlags);
+                return getRegData(ctx->threadContext.EFlags);
             case ZYDIS_REGISTER_XMM0:
-                return getRegValue(ctx->threadContext.Xmm0);
+                return getRegData(ctx->threadContext.Xmm0);
             case ZYDIS_REGISTER_XMM1:
-                return getRegValue(ctx->threadContext.Xmm1);
+                return getRegData(ctx->threadContext.Xmm1);
             case ZYDIS_REGISTER_XMM2:
-                return getRegValue(ctx->threadContext.Xmm2);
+                return getRegData(ctx->threadContext.Xmm2);
             case ZYDIS_REGISTER_XMM3:
-                return getRegValue(ctx->threadContext.Xmm3);
+                return getRegData(ctx->threadContext.Xmm3);
             case ZYDIS_REGISTER_XMM4:
-                return getRegValue(ctx->threadContext.Xmm4);
+                return getRegData(ctx->threadContext.Xmm4);
             case ZYDIS_REGISTER_XMM5:
-                return getRegValue(ctx->threadContext.Xmm5);
+                return getRegData(ctx->threadContext.Xmm5);
             case ZYDIS_REGISTER_XMM6:
-                return getRegValue(ctx->threadContext.Xmm6);
+                return getRegData(ctx->threadContext.Xmm6);
             case ZYDIS_REGISTER_XMM7:
-                return getRegValue(ctx->threadContext.Xmm7);
+                return getRegData(ctx->threadContext.Xmm7);
             case ZYDIS_REGISTER_XMM8:
-                return getRegValue(ctx->threadContext.Xmm8);
+                return getRegData(ctx->threadContext.Xmm8);
             case ZYDIS_REGISTER_XMM9:
-                return getRegValue(ctx->threadContext.Xmm9);
+                return getRegData(ctx->threadContext.Xmm9);
             case ZYDIS_REGISTER_XMM10:
-                return getRegValue(ctx->threadContext.Xmm10);
+                return getRegData(ctx->threadContext.Xmm10);
             case ZYDIS_REGISTER_XMM11:
-                return getRegValue(ctx->threadContext.Xmm11);
+                return getRegData(ctx->threadContext.Xmm11);
             case ZYDIS_REGISTER_XMM12:
-                return getRegValue(ctx->threadContext.Xmm12);
+                return getRegData(ctx->threadContext.Xmm12);
             case ZYDIS_REGISTER_XMM13:
-                return getRegValue(ctx->threadContext.Xmm13);
+                return getRegData(ctx->threadContext.Xmm13);
             case ZYDIS_REGISTER_XMM14:
-                return getRegValue(ctx->threadContext.Xmm14);
+                return getRegData(ctx->threadContext.Xmm14);
             case ZYDIS_REGISTER_XMM15:
-                return getRegValue(ctx->threadContext.Xmm15);
+                return getRegData(ctx->threadContext.Xmm15);
+            case ZYDIS_REGISTER_ST0:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[0]);
+            case ZYDIS_REGISTER_ST1:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[1]);
+            case ZYDIS_REGISTER_ST2:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[2]);
+            case ZYDIS_REGISTER_ST3:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[3]);
+            case ZYDIS_REGISTER_ST4:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[4]);
+            case ZYDIS_REGISTER_ST5:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[5]);
+            case ZYDIS_REGISTER_ST6:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[6]);
+            case ZYDIS_REGISTER_ST7:
+                return getRegData(ctx->threadContext.FltSave.FloatRegisters[7]);
+            case ZYDIS_REGISTER_X87STATUS:
+                return getRegData(ctx->threadContext.FltSave.StatusWord);
+            case ZYDIS_REGISTER_X87CONTROL:
+                return getRegData(ctx->threadContext.FltSave.ControlWord);
+            case ZYDIS_REGISTER_X87TAG:
+                return getRegData(ctx->threadContext.FltSave.TagWord);
+            case ZYDIS_REGISTER_MXCSR:
+                return getRegData(ctx->threadContext.FltSave.MxCsr);
         }
 
         assert(false);
         return {};
+    }
+
+    bool setRegBytes(Context* ctx, ZydisRegister reg, std::span<const std::uint8_t> data)
+    {
+        auto regData = getContextReg(ctx, reg);
+        if (data.size() > regData.size())
+        {
+            assert(false);
+            return false;
+        }
+
+        std::copy(data.begin(), data.end(), regData.begin());
+        return true;
+    }
+
+    std::span<const std::uint8_t> getRegBytes(Context* ctx, ZydisRegister reg)
+    {
+        return getContextReg(ctx, reg);
     }
 
     bool execute(Context* ctx)

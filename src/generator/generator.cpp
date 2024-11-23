@@ -1,4 +1,5 @@
 #include "generator.hpp"
+
 #include "basegenerator.hpp"
 
 #include <Zydis/Encoder.h>
@@ -74,7 +75,7 @@ namespace x86Tester::Generator
             struct Gp8MemRegs
             {
                 static constexpr ZydisRegister kTable[] = {
-                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_AL,  ZYDIS_REGISTER_CL,  ZYDIS_REGISTER_DL,
+                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_AL,  ZYDIS_REGISTER_CL,   ZYDIS_REGISTER_DL,
                     ZYDIS_REGISTER_BL,   ZYDIS_REGISTER_DIL, ZYDIS_REGISTER_R15B,
                 };
             };
@@ -82,24 +83,24 @@ namespace x86Tester::Generator
             struct Gp16MemRegs
             {
                 static constexpr ZydisRegister kTable[] = {
-                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_IP, ZYDIS_REGISTER_AX, ZYDIS_REGISTER_CX,
-                    ZYDIS_REGISTER_DX,   ZYDIS_REGISTER_R15W,
+                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_IP, ZYDIS_REGISTER_AX,
+                    ZYDIS_REGISTER_CX,   ZYDIS_REGISTER_DX, ZYDIS_REGISTER_R15W,
                 };
             };
 
             struct Gp32MemRegs
             {
                 static constexpr ZydisRegister kTable[] = {
-                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_EIP, ZYDIS_REGISTER_EAX, ZYDIS_REGISTER_ECX,
-                    ZYDIS_REGISTER_EDX,  ZYDIS_REGISTER_R15D,
+                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_EIP, ZYDIS_REGISTER_EAX,
+                    ZYDIS_REGISTER_ECX,  ZYDIS_REGISTER_EDX, ZYDIS_REGISTER_R15D,
                 };
             };
 
             struct Gp64MemRegs
             {
                 static constexpr ZydisRegister kTable[] = {
-                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_RIP, ZYDIS_REGISTER_RAX, ZYDIS_REGISTER_RCX,
-                    ZYDIS_REGISTER_RDX,  ZYDIS_REGISTER_R15,
+                    ZYDIS_REGISTER_NONE, ZYDIS_REGISTER_RIP, ZYDIS_REGISTER_RAX,
+                    ZYDIS_REGISTER_RCX,  ZYDIS_REGISTER_RDX, ZYDIS_REGISTER_R15,
                 };
             };
 
@@ -209,27 +210,33 @@ namespace x86Tester::Generator
         using Zmm = RegT<Detail::ZmmRegs>;
         using Tmm = RegT<Detail::TmmRegs>;
 
+        struct RegImplicit : public OperandBase
+        {
+            ZydisRegister reg;
+
+            RegImplicit(ZydisRegister reg)
+                : reg(reg)
+            {
+            }
+
+            ZydisEncoderOperand current() override
+            {
+                ZydisEncoderOperand op{};
+                op.type = ZYDIS_OPERAND_TYPE_REGISTER;
+                op.reg.value = reg;
+                return op;
+            }
+
+            bool advance() override
+            {
+                return false;
+            }
+        };
+
         class Imm : public OperandBase
         {
             static constexpr int64_t kValues[] = {
-                0,
-                1,
-                3,
-                4,
-                6,
-                8,
-                -1,
-                -2,
-                -3,
-                -4,
-                -8,
-                -9,
-                0x7F,
-                0x7FFF,
-                0x7FFFFFFF,
-                0x7FFFFFFFFFFFFFFF,
-                0xF,
-                0xFF,
+                0, 1, 3, 4, 6, 8, -1, -2, -3, -4, -8, -9, 0x7F, 0x7FFF, 0x7FFFFFFF, 0x7FFFFFFFFFFFFFFF, 0xF, 0xFF,
             };
 
             BaseGenerator<int64_t> _gen{ std::span(kValues) };
@@ -421,11 +428,22 @@ namespace x86Tester::Generator
 
     } // namespace Generators
 
-    static Generators::Operand buildOpGenerators(ZydisMnemonic mnemonic, const ZydisOperandDefinition& op)
+    static Generators::Operand buildOpGenerators(ZydisMnemonic mnemonic, const ZydisOperandDefinition& opDef)
     {
         Generators::Operand gens;
-        switch (op.type)
+
+        auto handleImplicitReg = [&]() {
+            if (opDef.op.reg.type == ZYDIS_IMPLREG_TYPE_STATIC)
+            {
+                gens.add<Generators::RegImplicit>(static_cast<ZydisRegister>(opDef.op.reg.reg.reg));
+            }
+        };
+
+        switch (opDef.type)
         {
+            case ZYDIS_SEMANTIC_OPTYPE_IMPLICIT_REG:
+                handleImplicitReg();
+                break;
             case ZYDIS_SEMANTIC_OPTYPE_GPR8:
                 gens.add<Generators::Gp8>();
                 break;
@@ -463,7 +481,7 @@ namespace x86Tester::Generator
                 gens.add<Generators::St>();
                 break;
             case ZYDIS_SEMANTIC_OPTYPE_MMX:
-                gens.add<Generators::Xmm>();
+                gens.add<Generators::Mmx>();
                 break;
             case ZYDIS_SEMANTIC_OPTYPE_XMM:
                 gens.add<Generators::Xmm>();
@@ -498,15 +516,6 @@ namespace x86Tester::Generator
         return filter.mnemonics.test(static_cast<size_t>(mnemonic));
     }
 
-    static bool categoryPassesFilter(const ZydisInstructionDefinition* definition, const Filter& filter)
-    {
-        if (filter.categories.none())
-            return true;
-
-        ZydisInstructionCategory category = (ZydisInstructionCategory)definition->category;
-        return filter.categories.test(static_cast<size_t>(category));
-    }
-
     static std::vector<Generators::Instr> createGenerators(const Filter& filter)
     {
         std::vector<Generators::Instr> instrs;
@@ -527,19 +536,16 @@ namespace x86Tester::Generator
                 ZydisGetInstructionDefinition(
                     (ZydisInstructionEncoding)entry.encoding, entry.instruction_reference, &base_definition);
 
-                if (!categoryPassesFilter(base_definition, filter))
-                    continue;
-
-                const ZydisOperandDefinition* operands = ZydisGetOperandDefinitions(base_definition);
+                const ZydisOperandDefinition* operandDefs = ZydisGetOperandDefinitions(base_definition);
 
                 Generators::Instr instr((ZydisMnemonic)mnemonic);
 
                 bool badCombination = false;
                 for (uint8_t j = 0; j < base_definition->operand_count_visible; ++j)
                 {
-                    const ZydisOperandDefinition& op = operands[j];
+                    const ZydisOperandDefinition& opDef = operandDefs[j];
 
-                    auto opGen = buildOpGenerators((ZydisMnemonic)mnemonic, op);
+                    auto opGen = buildOpGenerators((ZydisMnemonic)mnemonic, opDef);
                     if (opGen.empty())
                     {
                         badCombination = true;

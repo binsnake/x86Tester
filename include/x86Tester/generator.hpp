@@ -14,37 +14,11 @@ namespace x86Tester::Generator
     struct Filter
     {
         std::bitset<ZYDIS_MNEMONIC_MAX_VALUE + 1> mnemonics{};
-        std::bitset<ZYDIS_CATEGORY_MAX_VALUE + 1> categories{};
-
-        Filter addCategory(ZydisInstructionCategory category)
-        {
-            auto res = *this;
-            res.categories.set(static_cast<size_t>(category));
-            return res;
-        }
-
-        Filter exceptCategory(ZydisInstructionCategory category)
-        {
-            auto res = *this;
-            if (res.categories.none())
-                res.categories.set();
-            res.categories.reset(static_cast<size_t>(category));
-            return res;
-        }
 
         template<typename... TMnemonics> Filter addMnemonics(TMnemonics... mnemonic)
         {
             auto res = *this;
             (res.mnemonics.set(static_cast<size_t>(mnemonic)), ...);
-            return res;
-        }
-
-        Filter exceptMnemonic(ZydisMnemonic mnemonic)
-        {
-            auto res = *this;
-            if (res.mnemonics.none())
-                res.mnemonics.set();
-            res.mnemonics.reset(static_cast<size_t>(mnemonic));
             return res;
         }
     };

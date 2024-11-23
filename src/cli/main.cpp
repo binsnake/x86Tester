@@ -295,6 +295,7 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
             resultAlwaysZero = rightInputZero;
             break;
         case ZYDIS_MNEMONIC_ADD:
+        case ZYDIS_MNEMONIC_FADD:
             firstBitAlwaysZero = regDestAndSrcSame;
             break;
         case ZYDIS_MNEMONIC_MOV:
@@ -497,7 +498,8 @@ static void advanceInputs(
             continue;
 
         const auto bigRegSize = static_cast<size_t>(ZydisRegisterGetWidth(instr.info.machine_mode, reg) / 8);
-        const uint8_t ccBytes[] = {
+        constexpr uint8_t ccBytes[] = {
+            0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
             0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
         };
         ctx.setRegBytes(reg, std::span<const std::uint8_t>{ ccBytes, bigRegSize });
@@ -572,7 +574,7 @@ static void advanceInputs(
     // Ensure we never have TF set.
     flags &= ~ZYDIS_CPUFLAG_TF;
 
-    ctx.setRegValue(ZYDIS_REGISTER_RFLAGS, flags);
+    ctx.setRegValue(ZYDIS_REGISTER_EFLAGS, flags);
 
 #ifdef _DEBUG
     if (iteration >= kReportInputsThreshold)
@@ -623,7 +625,7 @@ static void clearOutput(Execution::ScopedContext& ctx, const TestBitInfo& testBi
     {
         flags = 0;
     }
-    ctx.setRegValue(ZYDIS_REGISTER_RFLAGS, flags);
+    ctx.setRegValue(ZYDIS_REGISTER_EFLAGS, flags);
 }
 
 static bool checkOutputs(
@@ -658,7 +660,7 @@ static bool checkOutputs(
 
     if (getFlagsModified(instr) != 0)
     {
-        testEntry.outputFlags = ctx.getRegValue<uint32_t>(ZYDIS_REGISTER_RFLAGS);
+        testEntry.outputFlags = ctx.getRegValue<uint32_t>(ZYDIS_REGISTER_EFLAGS);
         // Remove certain flags that are forced.
         *testEntry.outputFlags &= ~ZYDIS_CPUFLAG_IF;
     }
@@ -915,7 +917,7 @@ static bool serializeTestEntries(ZydisMnemonic mnemonic, const std::vector<Instr
 int main()
 {
     // TODO: Rework this and extract all possible mnemonics from the filter and iterate over that instead.
-    const ZydisMnemonic mnemonics[] = { ZYDIS_MNEMONIC_ADDSS, ZYDIS_MNEMONIC_SUBSS };
+    const ZydisMnemonic mnemonics[] = { ZYDIS_MNEMONIC_FADD };
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
     for (const auto mnemonic : mnemonics)
