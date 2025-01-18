@@ -361,6 +361,9 @@ static std::vector<TestBitInfo> generateTestMatrix(const ZydisDisassembledInstru
             case ZYDIS_MNEMONIC_LEA:
                 maxBits = instr.info.address_width;
                 break;
+            case ZYDIS_MNEMONIC_BSWAP:
+                resultAlwaysZero = regSize <= 16;
+                break;
         }
 
         for (std::uint16_t bitPos = 0; bitPos < regSize; ++bitPos)
@@ -592,7 +595,7 @@ static void advanceInputs(
 
     ctx.setRegValue(ZYDIS_REGISTER_EFLAGS, flags);
 
-#ifdef _DEBUG
+#if defined(_DEBU) && 0
     if (iteration >= kReportInputsThreshold)
     {
         std::string inputsStr;
@@ -2851,7 +2854,7 @@ int main()
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
 #ifdef _DEBUG
-    generateInstrTests(mode, ZYDIS_MNEMONIC_CMOVNL);
+    generateInstrTests(mode, ZYDIS_MNEMONIC_SHL);
 #else
     for (auto mnemonic : mnemonics)
     {
