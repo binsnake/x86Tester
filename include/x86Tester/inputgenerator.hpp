@@ -16,10 +16,12 @@ namespace x86Tester::Generator
             std::vector<T> numbers;
 
             // Add first 64 numbers, important for shifts and rotates.
-            for (T i = 0; i < 64; i++)
+            for (T i = 1; i < 64; i++)
             {
                 numbers.push_back(i);
             }
+
+            numbers.push_back(0);
 
             // Add all bits set.
             {
@@ -204,6 +206,9 @@ namespace x86Tester::Generator
             , _maxBits(maxBits)
         {
             _data.resize((maxBits + 7) / 8);
+            // Make sure we have an initial value.
+            advanceStrategy();
+            advance();
         }
 
         void reset()
