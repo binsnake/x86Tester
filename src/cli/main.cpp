@@ -679,8 +679,10 @@ static bool checkOutputs(
     if (getFlagsModified(instr) != 0)
     {
         testEntry.outputFlags = ctx.getRegValue<uint32_t>(ZYDIS_REGISTER_EFLAGS);
-        // Remove certain flags that are forced.
-        *testEntry.outputFlags &= ~ZYDIS_CPUFLAG_IF;
+
+        // Remove all flags that are not reported by Zydis.
+        const auto* cpuFlags = instr.info.cpu_flags;
+        *testEntry.outputFlags &= (cpuFlags->modified | cpuFlags->set_0 | cpuFlags->set_1 | cpuFlags->undefined);
     }
 
     return true;
@@ -2854,7 +2856,7 @@ int main()
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
 #ifdef _DEBUG
-    generateInstrTests(mode, ZYDIS_MNEMONIC_SHL);
+    generateInstrTests(mode, ZYDIS_MNEMONIC_ADD);
 #else
     for (auto mnemonic : mnemonics)
     {
