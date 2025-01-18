@@ -109,6 +109,11 @@ namespace x86Tester::Execution
             ctx->status = ExecutionStatus::ExceptionIntOverflow;
             return DebugStatus::Faulted;
         }
+        else if (record.ExceptionCode == EXCEPTION_ILLEGAL_INSTRUCTION)
+        {
+            ctx->status = ExecutionStatus::IllegalInstruction;
+            return DebugStatus::Faulted;
+        }
 
         std::print("Exception code: {:X}\n", record.ExceptionCode);
         std::print("Exception flags: {:X}\n", record.ExceptionFlags);
@@ -488,6 +493,7 @@ namespace x86Tester::Execution
         }
 
         std::copy(data.begin(), data.end(), regData.begin());
+
         return true;
     }
 

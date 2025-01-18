@@ -15,6 +15,7 @@ namespace x86Tester::Execution
         Success,
         ExceptionIntDivideError,
         ExceptionIntOverflow,
+        IllegalInstruction,
     };
 
     Context* prepare(ZydisMachineMode mode, std::span<const std::uint8_t> code);
