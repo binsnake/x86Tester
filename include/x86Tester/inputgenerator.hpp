@@ -6,12 +6,13 @@
 #include <random>
 #include <sfl/small_vector.hpp>
 #include <span>
+#include <xmmintrin.h>
 
 namespace x86Tester::Generator
 {
     namespace Detail
     {
-        template<typename T> static std::vector<std::int64_t> generateNumbers()
+        template<typename T> static std::vector<std::vector<std::uint8_t>> generateIntegers()
         {
             std::vector<T> numbers;
 
@@ -132,6 +133,21 @@ namespace x86Tester::Generator
                 }
             }
 
+            if constexpr (sizeof(T) >= 8)
+            {
+                std::mt19937_64 prng{ 1 };
+
+                // Generate random floating point numbers.
+                {
+                    std::uniform_real_distribution<double> dist(0.0f, 1.0f);
+                    for (size_t i = 0; i < 64; i++)
+                    {
+                        double value = dist(prng);
+                        numbers.push_back(std::bit_cast<std::int64_t>(value));
+                    }
+                }
+            }
+
             for (T i = 1; i < 16; i++)
             {
                 numbers.push_back(i);
@@ -158,22 +174,179 @@ namespace x86Tester::Generator
             numbers.erase(std::unique(numbers.begin(), numbers.end()), numbers.end());
 
             // Convert.
-            auto res = std::vector<std::int64_t>();
+            auto res = std::vector<std::vector<std::uint8_t>>{};
+            res.reserve(numbers.size());
+
             for (auto num : numbers)
             {
-                res.push_back(static_cast<std::int64_t>(num));
+                std::vector<std::uint8_t> bytes(sizeof(T));
+                std::memcpy(bytes.data(), &num, sizeof(T));
+                res.push_back(std::move(bytes));
             }
 
             return res;
         }
 
-        static const auto kMagicNumbers8b = generateNumbers<std::int8_t>();
+        static std::vector<std::vector<std::uint8_t>> generateXmmNumbers()
+        {
+            std::vector<std::vector<std::uint8_t>> res;
 
-        static const auto kMagicNumbers16b = generateNumbers<std::int16_t>();
+            // All bits set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0xFF);
+                res.push_back(std::move(bytes));
+            }
 
-        static const auto kMagicNumbers32b = generateNumbers<std::int32_t>();
+            // 0-31 set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+                for (std::size_t i = 0; i < 32; i++)
+                {
+                    bytes[i / 8] |= 1 << (i % 8);
+                }
+                res.push_back(std::move(bytes));
+            }
 
-        static const auto kMagicNumbers64b = generateNumbers<std::int64_t>();
+            // 32-63 set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+                for (std::size_t i = 32; i < 64; i++)
+                {
+                    bytes[i / 8] |= 1 << (i % 8);
+                }
+                res.push_back(std::move(bytes));
+            }
+
+            // 64-95 set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+                for (std::size_t i = 64; i < 96; i++)
+                {
+                    bytes[i / 8] |= 1 << (i % 8);
+                }
+                res.push_back(std::move(bytes));
+            }
+
+            // 96-127 set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+                for (std::size_t i = 96; i < 128; i++)
+                {
+                    bytes[i / 8] |= 1 << (i % 8);
+                }
+                res.push_back(std::move(bytes));
+            }
+
+            // Every second bit set.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+                for (std::size_t i = 0; i < 128; i += 2)
+                {
+                    bytes[i / 8] |= 1 << (i % 8);
+                }
+                res.push_back(std::move(bytes));
+            }
+
+            // Special values.
+            {
+                std::vector<std::uint8_t> bytes(16, 0);
+
+                __m128 val{};
+                val.m128_u64[0] = 0xFFFFFFFFFF8000FF;
+
+                std::memcpy(bytes.data(), &val, sizeof(val));
+
+                res.push_back(bytes);
+            }
+
+            // Random floats.
+            {
+                std::mt19937_64 prng{ 1 };
+                std::uniform_real_distribution<float> dist(-99999.0f, 99999.0f);
+                for (size_t i = 0; i < 64; i++)
+                {
+                    std::vector<std::uint8_t> bytes(16);
+
+                    __m128 val{};
+                    val.m128_f32[0] = dist(prng);
+                    val.m128_f32[1] = dist(prng);
+                    val.m128_f32[2] = dist(prng);
+                    val.m128_f32[3] = dist(prng);
+
+                    std::memcpy(bytes.data(), &val, sizeof(val));
+
+                    res.push_back(std::move(bytes));
+                }
+            }
+
+            for (std::uint32_t a0 = 0; a0 < 4; a0++)
+            {
+                for (std::uint32_t b0 = 0; b0 < 4; b0++)
+                {
+                    for (std::uint32_t c0 = 0; c0 < 4; c0++)
+                    {
+                        for (std::uint32_t d0 = 0; d0 < 4; d0++)
+                        {
+                            std::vector<std::uint8_t> bytes(16);
+
+                            __m128 val{};
+                            val.m128_u32[0] = a0 * 9;
+                            val.m128_u32[1] = b0 * 2147483647;
+                            val.m128_u32[2] = c0 * 3;
+                            val.m128_u32[3] = d0 * 9;
+
+                            std::memcpy(bytes.data(), &val, sizeof(val));
+
+                            res.push_back(std::move(bytes));
+                        }
+                    }
+                }
+            }
+
+            // Remove duplicates.
+            std::sort(res.begin(), res.end());
+            res.erase(std::unique(res.begin(), res.end()), res.end());
+
+            return res;
+        }
+
+        template<std::size_t TBitSize> std::vector<std::vector<std::uint8_t>> generateNumbers()
+        {
+            if constexpr (TBitSize == 8)
+            {
+                return generateIntegers<std::int8_t>();
+            }
+            else if constexpr (TBitSize == 16)
+            {
+                return generateIntegers<std::int16_t>();
+            }
+            else if constexpr (TBitSize == 32)
+            {
+                return generateIntegers<std::int32_t>();
+            }
+            else if constexpr (TBitSize == 64)
+            {
+                return generateIntegers<std::int64_t>();
+            }
+            else if constexpr (TBitSize == 128)
+            {
+                return generateXmmNumbers();
+            }
+            else
+            {
+                static_assert(TBitSize == 0, "Unsupported bit size");
+            }
+        }
+
+        static const auto kMagicNumbers8b = generateIntegers<std::int8_t>();
+
+        static const auto kMagicNumbers16b = generateIntegers<std::int16_t>();
+
+        static const auto kMagicNumbers32b = generateIntegers<std::int32_t>();
+
+        static const auto kMagicNumbers64b = generateIntegers<std::int64_t>();
+
+        static const auto kMagicNumbers128b = generateXmmNumbers();
 
     } // namespace Detail
 
@@ -315,46 +488,57 @@ namespace x86Tester::Generator
         {
             bool nextStrat = false;
 
-            if (_maxBits == 8)
+            if (_maxBits == 1)
             {
-                const auto value = Detail::kMagicNumbers8b[_counter % std::size(Detail::kMagicNumbers8b)];
+                const auto value = _counter & 1;
+                if (++_counter >= 2)
+                    nextStrat = true;
+
+                _data[0] = value;
+            }
+            else if (_maxBits == 8)
+            {
+                const auto valueBytes = Detail::kMagicNumbers8b[_counter % std::size(Detail::kMagicNumbers8b)];
                 if (++_counter >= std::size(Detail::kMagicNumbers8b))
                     nextStrat = true;
-                std::memcpy(_data.data(), &value, sizeof(value));
+
+                std::copy(valueBytes.begin(), valueBytes.end(), _data.begin());
             }
             else if (_maxBits == 16)
             {
-                const auto value = Detail::kMagicNumbers16b[_counter % std::size(Detail::kMagicNumbers16b)];
+                const auto valueBytes = Detail::kMagicNumbers16b[_counter % std::size(Detail::kMagicNumbers16b)];
                 if (++_counter >= std::size(Detail::kMagicNumbers16b))
                     nextStrat = true;
-                std::memcpy(_data.data(), &value, sizeof(value));
+
+                std::copy(valueBytes.begin(), valueBytes.end(), _data.begin());
             }
             else if (_maxBits == 32)
             {
-                const auto value = Detail::kMagicNumbers32b[_counter % std::size(Detail::kMagicNumbers32b)];
+                const auto valueBytes = Detail::kMagicNumbers32b[_counter % std::size(Detail::kMagicNumbers32b)];
                 if (++_counter >= std::size(Detail::kMagicNumbers32b))
                     nextStrat = true;
-                std::memcpy(_data.data(), &value, sizeof(value));
+
+                std::copy(valueBytes.begin(), valueBytes.end(), _data.begin());
             }
             else if (_maxBits == 64)
             {
-                const auto value = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
+                const auto valueBytes = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
                 if (++_counter >= std::size(Detail::kMagicNumbers64b))
                     nextStrat = true;
-                std::memcpy(_data.data(), &value, sizeof(value));
+
+                std::copy(valueBytes.begin(), valueBytes.end(), _data.begin());
             }
             else if (_maxBits == 128)
             {
-                const auto value1 = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
-                if (++_counter >= std::size(Detail::kMagicNumbers64b))
+                const auto valueBytes = Detail::kMagicNumbers128b[_counter % std::size(Detail::kMagicNumbers128b)];
+                if (++_counter >= std::size(Detail::kMagicNumbers128b))
                     nextStrat = true;
 
-                const auto value2 = Detail::kMagicNumbers64b[_counter % std::size(Detail::kMagicNumbers64b)];
-                if (++_counter >= std::size(Detail::kMagicNumbers64b))
-                    nextStrat = true;
-
-                std::memcpy(_data.data(), &value1, sizeof(value1));
-                std::memcpy(_data.data() + sizeof(value1), &value2, sizeof(value2));
+                std::copy(valueBytes.begin(), valueBytes.end(), _data.begin());
+            }
+            else
+            {
+                assert(false);
             }
 
             if (nextStrat)
