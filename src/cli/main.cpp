@@ -655,7 +655,9 @@ static bool checkOutputs(
     const auto regData = ctx.getRegBytes(bigReg);
     const auto regOffset = getRegOffset(testBitInfo.reg);
 
-    const auto bitValue = (regData[regOffset + (testBitInfo.bitPos / 8)] >> (testBitInfo.bitPos % 8)) & 1;
+    // The raw memory of all registers are stored little endian so the first bit is in the last byte.
+    const auto byteOffset = regOffset + ((testBitInfo.bitPos / 8) ^ (sizeof(regData[0]) - 1));
+    const auto bitValue = (regData[byteOffset] >> (testBitInfo.bitPos % 8)) & 0x01;
 
     if (bitValue != testBitInfo.expectedBitValue)
     {
@@ -1157,16 +1159,11 @@ int main()
         ZYDIS_MNEMONIC_CMPPD,
         ZYDIS_MNEMONIC_CMPPS,
         ZYDIS_MNEMONIC_CMPSB,
-        ZYDIS_MNEMONIC_CMPSD,
-        ZYDIS_MNEMONIC_CMPSQ,
-        ZYDIS_MNEMONIC_CMPSS,
-        ZYDIS_MNEMONIC_CMPSW,
         ZYDIS_MNEMONIC_CMPXCHG,
         ZYDIS_MNEMONIC_CMPXCHG16B,
         ZYDIS_MNEMONIC_CMPXCHG8B,
         ZYDIS_MNEMONIC_COMISD,
         ZYDIS_MNEMONIC_COMISS,
-        ZYDIS_MNEMONIC_CPUID,
         ZYDIS_MNEMONIC_CQO,
         ZYDIS_MNEMONIC_CVTDQ2PD,
         ZYDIS_MNEMONIC_CVTDQ2PS,
@@ -2765,6 +2762,11 @@ int main()
         ZYDIS_MNEMONIC_ANDPD,
         ZYDIS_MNEMONIC_ANDPS,
         ZYDIS_MNEMONIC_BEXTR,
+        // ZYDIS_MNEMONIC_CMPSD,
+        // ZYDIS_MNEMONIC_CMPSQ,
+        // ZYDIS_MNEMONIC_CMPSS,
+        // ZYDIS_MNEMONIC_CMPSW,
+        // ZYDIS_MNEMONIC_CPUID,
         // ZYDIS_MNEMONIC_CRC32,
         // ZYDIS_MNEMONIC_STOSB,
         // ZYDIS_MNEMONIC_STOSD,
@@ -2856,7 +2858,7 @@ int main()
     const auto mode = ZydisMachineMode::ZYDIS_MACHINE_MODE_LONG_64;
 
 #ifdef _DEBUG
-    generateInstrTests(mode, ZYDIS_MNEMONIC_ADD);
+    generateInstrTests(mode, ZYDIS_MNEMONIC_CVTDQ2PD);
 #else
     for (auto mnemonic : mnemonics)
     {

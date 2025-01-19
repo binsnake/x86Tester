@@ -66,3 +66,12 @@ private-link-libraries = ["x86Tester::core", "x86Tester::generator", "x86Tester:
 
 [target.x86Tester-cli.properties]
 PROJECT_LABEL = "cli"
+
+[target.x86Tester-tests]
+type = "executable"
+sources = ["src/tests/main.cpp", "src/tests/test.execution.cpp"]
+compile-features = ["cxx_std_23"]
+private-link-libraries = ["x86Tester::core", "x86Tester::generator", "x86Tester::execution", "GTest::gtest"]
+
+[target.x86Tester-tests.properties]
+PROJECT_LABEL = "tests"

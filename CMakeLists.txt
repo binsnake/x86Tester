@@ -215,3 +215,36 @@ get_directory_property(CMKR_VS_STARTUP_PROJECT DIRECTORY ${PROJECT_SOURCE_DIR} D
 if(NOT CMKR_VS_STARTUP_PROJECT)
 	set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT x86Tester-cli)
 endif()
+
+# Target: x86Tester-tests
+set(x86Tester-tests_SOURCES
+	cmake.toml
+	"src/tests/main.cpp"
+	"src/tests/test.execution.cpp"
+)
+
+add_executable(x86Tester-tests)
+
+target_sources(x86Tester-tests PRIVATE ${x86Tester-tests_SOURCES})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${x86Tester-tests_SOURCES})
+
+target_compile_features(x86Tester-tests PRIVATE
+	cxx_std_23
+)
+
+target_link_libraries(x86Tester-tests PRIVATE
+	x86Tester::core
+	x86Tester::generator
+	x86Tester::execution
+	GTest::gtest
+)
+
+set_target_properties(x86Tester-tests PROPERTIES
+	PROJECT_LABEL
+		tests
+)
+
+get_directory_property(CMKR_VS_STARTUP_PROJECT DIRECTORY ${PROJECT_SOURCE_DIR} DEFINITION VS_STARTUP_PROJECT)
+if(NOT CMKR_VS_STARTUP_PROJECT)
+	set_property(DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT x86Tester-tests)
+endif()
