@@ -756,35 +756,51 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
     testCase.address = ctx.getCodeAddress();
 
     const auto seed = static_cast<std::size_t>(instr.info.mnemonic);
-    std::mt19937_64 prng(seed);
 
-    for (const TestBitInfo& testBitInfo : testMatrix)
-    {
+    std::mutex entryMutex;
+    std::mutex logMutex;
+    std::vector<TestCaseEntry> localEntries;
+    std::atomic<bool> foundIllegal{ false };
+
+    std::for_each(std::execution::par, testMatrix.begin(), testMatrix.end(), [&](const TestBitInfo& testBitInfo) {
+        if (foundIllegal.load())
+            return;
+
         TestCaseEntry testEntry{};
+        auto localCtx = Execution::ScopedContext(mode, instrData);
+        if (!localCtx)
+        {
+            std::scoped_lock lock(logMutex);
+            Logging::println("Failed to prepare local context");
+            return;
+        }
 
+        std::mt19937_64 prng(seed);
         auto inputGenerators = setupInputGenerators(prng, instr);
 
         bool hasExpected = false;
         bool illegalInstr = false;
 
         std::size_t iteration = 0;
+
         // Repeat this until expected bit is set.
         while (!hasExpected && !illegalInstr)
         {
             // Ensure the output has the opposite value.
-            clearOutput(mode, ctx, testBitInfo);
-
+            clearOutput(mode, localCtx, testBitInfo);
+            std::mt19937_64 prng(seed);
             // Assign inputs.
-            advanceInputs(ctx, prng, inputGenerators, instr, testEntry, iteration);
+            advanceInputs(localCtx, prng, inputGenerators, instr, testEntry, iteration);
 
-            if (!ctx.execute())
+            if (!localCtx.execute())
             {
+                std::scoped_lock lock(logMutex);
                 Logging::println("Failed to execute instruction");
                 return;
             }
 
             ExceptionType exceptionType = ExceptionType::None;
-            if (auto status = ctx.getExecutionStatus(); status != Execution::ExecutionStatus::Success)
+            if (auto status = localCtx.getExecutionStatus(); status != Execution::ExecutionStatus::Success)
             {
                 switch (status)
                 {
@@ -798,13 +814,10 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
                         illegalInstr = true;
                         break;
                 }
-                if (exceptionType != testBitInfo.exceptionType)
+
+                if (exceptionType == testBitInfo.exceptionType)
                 {
                     // Unexpected exception, ignore.
-                    hasExpected = false;
-                }
-                else
-                {
                     testEntry.exceptionType = exceptionType;
                     hasExpected = true;
                 }
@@ -813,16 +826,13 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
             {
                 // If we expect an exception we don't care about the output.
                 if (testBitInfo.exceptionType == ExceptionType::None)
-                {
-                    hasExpected = checkOutputs(mode, ctx, instr, testBitInfo, testEntry);
-                }
+                    hasExpected = checkOutputs(mode, localCtx, instr, testBitInfo, testEntry);
             }
 
-            iteration++;
-
-            if (iteration > maxAttempts)
+            if (++iteration > maxAttempts)
             {
                 // Probably impossible.
+                std::scoped_lock lock(logMutex);
                 Logging::println("Test probably impossible: {} ; {}", instr.text, getTestInfo(testBitInfo));
                 break;
             }
@@ -830,15 +840,26 @@ static void testInstruction(ZydisMachineMode mode, InstrTestGroup& testCase)
 
         if (illegalInstr)
         {
+            foundIllegal.store(true);
+            std::scoped_lock lock(logMutex);
             Logging::println("Illegal instruction: {}", instr.text);
-            testCase.illegalInstruction = true;
-            break;
+            return;
         }
 
         if (hasExpected)
         {
-            testCase.entries.push_back(std::move(testEntry));
+            std::scoped_lock lock(entryMutex);
+            localEntries.push_back(std::move(testEntry));
         }
+    });
+
+    if (foundIllegal.load())
+    {
+        testCase.illegalInstruction = true;
+    }
+    else
+    {
+        std::move(localEntries.begin(), localEntries.end(), std::back_inserter(testCase.entries));
     }
 
     const auto timeEnd = std::chrono::high_resolution_clock::now();
